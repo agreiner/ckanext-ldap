@@ -185,16 +185,25 @@ def _find_ldap_user(login):
     @return: None if no user is found, a dictionary defining 'cn', 'username', 'fullname' and 'email otherwise.
     """
     cnx = ldap.initialize(config['ldap.uri'])
-    if config['ldap.auth.dn']:
+    cnx.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
+    if config.has_key('ldap.auth.dn'):
         try:
-            cnx.bind_s(config['ldap.auth.dn'], config['ldap.auth.password'])
+            cnx.simple_bind_s(config['ldap.auth.dn'], config['ldap.auth.password'])
         except ldap.SERVER_DOWN:
             log.error('LDAP server is not reachable')
             return None
         except ldap.INVALID_CREDENTIALS:
             log.error('LDAP server credentials (ldap.auth.dn and ldap.auth.password) invalid')
             return None
-
+    else:
+        try:
+            cnx.simple_bind_s('uid=' + login + ',OU=people,DC=crcns,DC=org')
+        except ldap.SERVER_DOWN:
+            log.error('LDAP server is not reachable')
+            return None
+        except ldap.INVALID_CREDENTIALS:
+            log.error('LDAP server credentials (ldap.auth.dn and ldap.auth.password) invalid')
+            return None
     filter_str = config['ldap.search.filter'].format(login=ldap.filter.escape_filter_chars(login))
     attributes = [config['ldap.username']]
     if 'ldap.fullname' in config:
@@ -277,8 +286,9 @@ def _check_ldap_password(cn, password):
     @return: True on success, False on failure
     """
     cnx = ldap.initialize(config['ldap.uri'])
+    cnx.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
     try:
-        cnx.bind_s(cn, password)
+        cnx.simple_bind_s(cn, password)
     except ldap.SERVER_DOWN:
         log.error('LDAP server is not reachable')
         return False
